@@ -4,7 +4,8 @@ import numpy as np
 
 class OptionCritic(object):
     def __init__(self, sess, d_in, n_actions, n_options, h1_units, h2_units, lr=0.0002, critic_lr=0.0004,
-                 gamma=0.99, ddqn=False, terminal_reg=0, entropy_reg=0, update_target_turns=100, clip_loss=1, baseline=False,
+                 gamma=0.99, ddqn=False, terminal_reg=0, entropy_reg=0, update_target_turns=100, clip_loss=1,
+                 baseline=False,
                  batch_size=32):
         self.sess = sess
         self.s_dim = d_in
@@ -31,7 +32,7 @@ class OptionCritic(object):
         self.o = tf.placeholder(tf.int32, [None], name='option')
         self.a = tf.placeholder(tf.int32, [None], name='action')
         self.terminal = tf.placeholder(tf.float32, [None], name='is_terminal')
-        self.tau = tf.placeholder(tf.float32, [], name='tau') # a scalar
+        self.tau = tf.placeholder(tf.float32, [], name='tau')  # a scalar
 
         # initialization
         self.init_w, self.init_b = tf.random_normal_initializer(0., 0.01), tf.constant_initializer(0.)
@@ -84,13 +85,13 @@ class OptionCritic(object):
         if self.ddqn:
             print "training with ddqn algorithm"
             y = tf.squeeze(self.r, axis=1) + (1 - self.terminal) * self.gamma * (
-                (1 - disc_option_term_prob) * tf.gather_nd(Q_next_prime, o_idx) +
-                disc_option_term_prob * tf.gather_nd(Q_next_prime, max_idx))
+                    (1 - disc_option_term_prob) * tf.gather_nd(Q_next_prime, o_idx) +
+                    disc_option_term_prob * tf.gather_nd(Q_next_prime, max_idx))
         else:
             print "training with dqn"
             y = tf.squeeze(self.r, axis=1) + (1 - self.terminal) * self.gamma * (
-                (1 - disc_option_term_prob) * tf.gather_nd(Q_next_prime, o_idx) +
-                disc_option_term_prob * tf.reduce_max(Q_next_prime, axis=1)
+                    (1 - disc_option_term_prob) * tf.gather_nd(Q_next_prime, o_idx) +
+                    disc_option_term_prob * tf.reduce_max(Q_next_prime, axis=1)
             )
 
         y = tf.stop_gradient(y)
@@ -126,9 +127,11 @@ class OptionCritic(object):
             entropy = - tf.reduce_sum(self.action_probs * tf.log(self.action_probs), axis=[0, 1])
 
             if not BASELINE:
-                policy_grad = -tf.reduce_sum(tf.log(tf.gather_nd(self.action_probs, a_idx)) * y) - self.entropy_reg * entropy
+                policy_grad = -tf.reduce_sum(
+                    tf.log(tf.gather_nd(self.action_probs, a_idx)) * y) - self.entropy_reg * entropy
             else:
-                policy_grad = -tf.reduce_sum(tf.log(tf.gather_nd(self.action_probs, a_idx)) * (y - dis_Q)) - self.entropy_reg * entropy
+                policy_grad = -tf.reduce_sum(
+                    tf.log(tf.gather_nd(self.action_probs, a_idx)) * (y - dis_Q)) - self.entropy_reg * entropy
 
             gvs = opt.compute_gradients(term_grad + policy_grad, actor_params)
 
@@ -209,12 +212,13 @@ class OptionCritic(object):
     def train(self, state, option, action, reward, next_state, terminal):
         print "training ...."
         self.sess.run([self.otrain, self.ctrain],
-                      feed_dict={self.s: state, self.o: option, self.a: action, self.r: reward, self.s_: next_state, self.terminal: terminal})
+                      feed_dict={self.s: state, self.o: option, self.a: action, self.r: reward, self.s_: next_state,
+                                 self.terminal: terminal})
 
     def update_target(self, tau):
         print "freeze interval:", self.freeze_interval
         print "Updating eval net to target net..."
-        self.sess.run(self.update_target_op, feed_dict={self.tau:tau})
+        self.sess.run(self.update_target_op, feed_dict={self.tau: tau})
 
     def predict_option(self, s):
         s = np.array(s)
@@ -247,7 +251,7 @@ class OptionCritic(object):
 
     def load_network(self, load_filename):
         self.saver = tf.train.Saver()
-        #self.saver.restore(self.sess, load_filename)
+        # self.saver.restore(self.sess, load_filename)
         try:
             self.saver.restore(self.sess, load_filename)
             print "Successfully loaded:", load_filename

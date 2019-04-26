@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 CLIP_LOSS = 1.0
-BASELINE = True # using baseline for option critic
+BASELINE = True  # using baseline for option critic
 
 
 class OptionCritic(object):
@@ -14,8 +14,8 @@ class OptionCritic(object):
         self.a_dim = n_actions
         self.h1_size = h1_units
         self.h2_size = h2_units
-        self.p_lr = lr        # learning rate for policy gradient
-        self.c_lr = critic_lr # learning rate for Q(s,o,a) and Q(s, o)
+        self.p_lr = lr  # learning rate for policy gradient
+        self.c_lr = critic_lr  # learning rate for Q(s,o,a) and Q(s, o)
         self.n_options = n_options
         self.gamma = gamma
         self.ddqn = ddqn
@@ -24,7 +24,6 @@ class OptionCritic(object):
         self.freeze_interval = update_target_turns
         self.batch_size = batch_size
 
-
         # placeholders
         self.s = tf.placeholder(tf.float32, [None, self.s_dim], name='S')
         self.s_ = tf.placeholder(tf.float32, [None, self.s_dim], name='S_')
@@ -32,8 +31,8 @@ class OptionCritic(object):
         self.ra = tf.placeholder(tf.float32, [None, 1], name='combined_reward')
         self.o = tf.placeholder(tf.int32, [None], name='option')
         self.a = tf.placeholder(tf.int32, [None], name='action')
-        self.terminal = tf.placeholder(tf.float32, [None], name='is_terminal') # 0 or 1
-        self.tau = tf.placeholder(tf.float32, [], name='tau') # a scalar
+        self.terminal = tf.placeholder(tf.float32, [None], name='is_terminal')  # 0 or 1
+        self.tau = tf.placeholder(tf.float32, [], name='tau')  # a scalar
 
         # initialization
         self.init_w, self.init_b = tf.random_normal_initializer(0., 0.01), tf.constant_initializer(0.)
@@ -46,9 +45,10 @@ class OptionCritic(object):
 
         # Q(s,o) option based state option value function
         with tf.variable_scope('Q_s_o'):
-            self.Q = self._build_Q_net(self.feat, self.n_options,  "Q_net_eval") # Q(s,o)
-            Q_next = self._build_Q_net(self.feat_, self.n_options, "Q_net_eval", reuse=True) # Q(s_, o)
-            Q_next_prime = self._build_Q_net(next_feat_prime, self.n_options, "Q_net_target", trainable=False) # Q'(s_, o)
+            self.Q = self._build_Q_net(self.feat, self.n_options, "Q_net_eval")  # Q(s,o)
+            Q_next = self._build_Q_net(self.feat_, self.n_options, "Q_net_eval", reuse=True)  # Q(s_, o)
+            Q_next_prime = self._build_Q_net(next_feat_prime, self.n_options, "Q_net_target",
+                                             trainable=False)  # Q'(s_, o)
 
         # Q(s,o,a) state action value function for intra-policym, use "u" indicates the intra-Q
         with tf.variable_scope('Q_s_o_a'):
@@ -93,24 +93,26 @@ class OptionCritic(object):
             #     self.update_u_target_op = [tf.assign(t, e) for t, e in zip(self.qu_target_params, self.qu_eval_params)]
             # else:
             self.update_target_op = [self.q_target_params[i].assign(
-                tf.multiply(self.tau , self.q_eval_params[i]) + tf.multiply(1 - self.tau, self.q_target_params[i])) for i in range(len(self.q_target_params))]
+                tf.multiply(self.tau, self.q_eval_params[i]) + tf.multiply(1 - self.tau, self.q_target_params[i])) for i
+                in range(len(self.q_target_params))]
             self.update_u_target_op = [self.qu_target_params[i].assign(
-                self.tau * self.qu_eval_params[i] + (1 - self.tau) * self.qu_target_params[i]) for i in  range(len(self.qu_target_params))]
+                self.tau * self.qu_eval_params[i] + (1 - self.tau) * self.qu_target_params[i]) for i in
+                range(len(self.qu_target_params))]
 
         # =======================define loss=====================================
         max_idx = tf.stack([tf.range(tf.shape(Q_next)[0]), tf.argmax(Q_next, axis=1, output_type=tf.int32)], axis=1)
         if self.ddqn:
             print "training with ddqn algorithm"
             g = (1 - self.terminal) * self.gamma * (
-                (1 - disc_option_term_prob) * tf.gather_nd(Q_next_prime, o_idx) +
-                disc_option_term_prob * tf.gather_nd(Q_next_prime, max_idx))
+                    (1 - disc_option_term_prob) * tf.gather_nd(Q_next_prime, o_idx) +
+                    disc_option_term_prob * tf.gather_nd(Q_next_prime, max_idx))
             y = tf.squeeze(self.ro, axis=1) + g
             y_u = tf.squeeze(self.ra, axis=1) + g
         else:
             print "training with dqn"
             g = (1 - self.terminal) * self.gamma * (
-                (1 - disc_option_term_prob) * tf.gather_nd(Q_next_prime, o_idx) +
-                disc_option_term_prob * tf.reduce_max(Q_next_prime, axis=1))
+                    (1 - disc_option_term_prob) * tf.gather_nd(Q_next_prime, o_idx) +
+                    disc_option_term_prob * tf.reduce_max(Q_next_prime, axis=1))
             y = tf.squeeze(self.ro, axis=1) + g
             y_u = tf.squeeze(self.ra, axis=1) + g
 
@@ -119,7 +121,7 @@ class OptionCritic(object):
         Q_option = tf.gather_nd(self.Q, o_idx)
         Q_u = tf.gather_nd(self.Qu, a_idx)
         td_errors = y - Q_option
-        td_action_err = y_u  - Q_u
+        td_action_err = y_u - Q_u
 
         if CLIP_LOSS > 0:
             td_cost = self.huber_loss(td_errors, CLIP_LOSS)
@@ -127,7 +129,6 @@ class OptionCritic(object):
         else:
             td_cost = 0.5 * td_errors ** 2
             td_cost_u = 0.5 * td_action_err ** 2
-
 
         with tf.variable_scope('critic_loss'):
             self.closs = np.sum(td_cost)
@@ -152,9 +153,11 @@ class OptionCritic(object):
             entropy = - tf.reduce_sum(self.action_probs * tf.log(self.action_probs), axis=[0, 1])
 
             if not BASELINE:
-                policy_grad = -tf.reduce_sum(tf.log(tf.gather_nd(self.action_probs, a_idx)) * y_u) - self.entropy_reg * entropy
+                policy_grad = -tf.reduce_sum(
+                    tf.log(tf.gather_nd(self.action_probs, a_idx)) * y_u) - self.entropy_reg * entropy
             else:
-                policy_grad = -tf.reduce_sum(tf.log(tf.gather_nd(self.action_probs, a_idx)) * (y_u - dis_Q)) - self.entropy_reg * entropy
+                policy_grad = -tf.reduce_sum(
+                    tf.log(tf.gather_nd(self.action_probs, a_idx)) * (y_u - dis_Q)) - self.entropy_reg * entropy
 
             gvs = opt.compute_gradients(term_grad + policy_grad, actor_params)
 
@@ -206,7 +209,7 @@ class OptionCritic(object):
         with tf.variable_scope(scope_name, reuse=reuse):
             self.intro_option_q = []
             for i in range(self.n_options):
-                Qu_o = self._build_option_layer(feat,  name='Q_u_s_{}'.format(i), trainable=trainable)
+                Qu_o = self._build_option_layer(feat, name='Q_u_s_{}'.format(i), trainable=trainable)
                 self.intro_option_q.append(Qu_o)
         self.q_options = tf.stack(self.intro_option_q, axis=1)
         # self.intro_option_policies = tf.tile(self.intro_option_policies, tf.shape(self.o)[0])
@@ -254,7 +257,7 @@ class OptionCritic(object):
     def update_target(self, tau):
         print "freeze interval:", self.freeze_interval
         print "Updating eval net to target net for Q(s,o) and Q(s,o,a) ..."
-        self.sess.run([self.update_target_op, self.update_u_target_op], feed_dict={self.tau:tau})
+        self.sess.run([self.update_target_op, self.update_u_target_op], feed_dict={self.tau: tau})
 
     def predict_option(self, s):
         s = np.array(s)
@@ -264,7 +267,7 @@ class OptionCritic(object):
         return np.argmax(Q, axis=1)
 
     def predict_intra_q(self, s, o):
-        return self.sess.run(self.Qu, feed_dict={self.s:s, self.o: o})
+        return self.sess.run(self.Qu, feed_dict={self.s: s, self.o: o})
 
     def terminal_sample(self, s, o):
         # predict terminal and sample the next option
@@ -290,7 +293,7 @@ class OptionCritic(object):
 
     def load_network(self, load_filename):
         self.saver = tf.train.Saver()
-        #self.saver.restore(self.sess, load_filename)
+        # self.saver.restore(self.sess, load_filename)
         try:
             self.saver.restore(self.sess, load_filename)
             print "Successfully loaded:", load_filename
@@ -302,5 +305,4 @@ class OptionCritic(object):
         self.saver.save(self.sess, save_filename)
 
     def huber_loss(self, err, d):
-        return tf.where(tf.abs(err) < d, 0.5 * tf.square(err), d * (tf.abs(err) - d/2))
-
+        return tf.where(tf.abs(err) < d, 0.5 * tf.square(err), d * (tf.abs(err) - d / 2))
